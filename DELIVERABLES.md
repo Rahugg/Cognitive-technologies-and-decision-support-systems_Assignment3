@@ -2,7 +2,7 @@
 
 ## Project files
 
-- [x] Python source: Streamlit app, four cognitive modules, CNN, data/training/demo scripts.
+- [x] Python source: live WebRTC camera app, four cognitive modules, CNN, data/training/demo scripts.
 - [x] Dockerfile and Docker Compose profiles for PostgreSQL, app, data preparation, training and notebook.
 - [x] Assignment notebook with reproducible pipeline and three demo cases.
 - [x] Updated technical report PDF: `Assignment3_Technical_Report_FINAL.pdf`.
@@ -18,7 +18,7 @@ docker compose up --build
 docker compose exec app python scripts/run_demo.py
 ```
 
-Open `http://localhost:8501`. For Jupyter use `docker compose --profile notebook up jupyter db` and open `http://localhost:8888`.
+Run `make run` or double-click `Run Emotion Recognition.command`. Open `http://localhost:8501`, click **START** in **Live camera**, and allow camera access. For Jupyter use `docker compose --profile notebook up jupyter db` and open `http://localhost:8888`.
 
 ## Submission checks
 

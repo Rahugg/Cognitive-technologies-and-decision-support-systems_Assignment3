@@ -8,6 +8,6 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL", "postgresql://emotion:emotion@localhost:5433/emotiondb"
 )
 QUALITY_THRESHOLD = float(os.getenv("QUALITY_THRESHOLD", "0.45"))
-CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.55"))
+CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.25"))
 STM_WINDOW = int(os.getenv("STM_WINDOW", "5"))
 EMOTIONS = ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"]

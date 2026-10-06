@@ -77,7 +77,7 @@ def rows_from_fer_csv(raw_root):
 def main():
     parser = argparse.ArgumentParser(description="Create normalized train/val/test index")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--max-per-class-source", type=int, default=1500,
+    parser.add_argument("--max-per-class-source", type=int, default=0,
                         help="Set 0 to keep all matching images")
     args = parser.parse_args()
     raw_root = DATA_DIR / "raw"

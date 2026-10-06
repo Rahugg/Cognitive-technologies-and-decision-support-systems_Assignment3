@@ -52,6 +52,24 @@ class Memory:
     def recent(self, session_id):
         return list(self.sessions[session_id])
 
+    def smooth_prediction(self, session_id, perception, accepted):
+        """Average the last accepted frame probabilities for a short video context."""
+        if not accepted:
+            return {key: perception[key] for key in ("emotion", "confidence", "probabilities")}
+
+        history = [item["probabilities"] for item in self.sessions[session_id]
+                   if item["accepted"] and "probabilities" in item]
+        history.append(perception["probabilities"])
+        history = history[-self.sessions[session_id].maxlen:]
+        count = len(history)
+        probabilities = {
+            emotion: sum(frame[emotion] for frame in history) / count
+            for emotion in perception["probabilities"]
+        }
+        emotion = max(probabilities, key=probabilities.get)
+        return {"emotion": emotion, "confidence": probabilities[emotion],
+                "probabilities": probabilities}
+
     def record(self, session_id, perception, attention, outcome):
         record = {
             "emotion": perception["emotion"],
@@ -59,6 +77,7 @@ class Memory:
             "quality": float(perception["quality_score"]),
             "relevance": float(attention["relevance"]),
             "accepted": bool(attention["accepted"]),
+            "probabilities": perception["probabilities"],
             "outcome": outcome,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }

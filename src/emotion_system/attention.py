@@ -1,5 +1,5 @@
 class Attention:
-    def __init__(self, quality_threshold=0.45, confidence_threshold=0.55):
+    def __init__(self, quality_threshold=0.45, confidence_threshold=0.25):
         self.quality_threshold = quality_threshold
         self.confidence_threshold = confidence_threshold
 

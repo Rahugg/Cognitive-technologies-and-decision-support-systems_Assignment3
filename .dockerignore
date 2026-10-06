@@ -1,0 +1,13 @@
+.git/
+.env
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+data/raw/
+data/processed/
+models/*.pt
+models/*.json
+*.pdf
+*.pptx
+*.ipynb
+output/

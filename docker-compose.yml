@@ -16,7 +16,9 @@ services:
       - "5433:5432"
 
   app:
-    build: .
+    build:
+      context: .
+      target: app
     depends_on:
       db:
         condition: service_healthy
@@ -25,7 +27,7 @@ services:
       MODEL_PATH: /workspace/models/emotion_cnn.pt
       DATA_DIR: /workspace/data
       QUALITY_THRESHOLD: "0.45"
-      CONFIDENCE_THRESHOLD: "0.55"
+      CONFIDENCE_THRESHOLD: "0.25"
       STM_WINDOW: "5"
     volumes:
       - ./data:/workspace/data
@@ -35,7 +37,9 @@ services:
     restart: unless-stopped
 
   dataset-downloader:
-    build: .
+    build:
+      context: .
+      target: app
     profiles: ["data"]
     environment:
       KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
@@ -45,22 +49,27 @@ services:
       - ./data:/workspace/data
     command: >-
       sh -lc "python scripts/download_datasets.py --datasets fer2013 ckplus rafdb &&
-      python scripts/prepare_dataset.py --max-per-class-source ${MAX_PER_CLASS_SOURCE:-1500} --seed ${SEED:-42}"
+      python scripts/prepare_dataset.py --max-per-class-source ${MAX_PER_CLASS_SOURCE:-0} --seed ${SEED:-42}"
 
   trainer:
-    build: .
+    build:
+      context: .
+      target: app
     profiles: ["train"]
     environment:
       DATA_DIR: /workspace/data
       MODEL_PATH: /workspace/models/emotion_cnn.pt
       SEED: ${SEED:-42}
+      EPOCHS: ${EPOCHS:-8}
     volumes:
       - ./data:/workspace/data
       - ./models:/workspace/models
-    command: python scripts/train.py --epochs ${EPOCHS:-5}
+    command: python scripts/train.py --epochs ${EPOCHS:-8}
 
   jupyter:
-    build: .
+    build:
+      context: .
+      target: notebook
     profiles: ["notebook"]
     depends_on:
       db:
