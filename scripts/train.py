@@ -88,6 +88,8 @@ def main():
     parser.add_argument("--batch-size", type=int, default=96)
     parser.add_argument("--patience", type=int, default=4)
     parser.add_argument("--seed", type=int, default=int(os.getenv("SEED", "42")))
+    parser.add_argument("--resume-from", type=Path,
+                        help="Fine-tune from a compatible checkpoint instead of random initialization")
     args = parser.parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -120,7 +122,14 @@ def main():
     weights /= weights.mean()
     weight_tensor = torch.tensor(weights, dtype=torch.float32, device=device)
     model = EmotionCNN().to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=8e-4, weight_decay=1e-4)
+    if args.resume_from:
+        if not args.resume_from.exists():
+            raise SystemExit(f"Checkpoint not found: {args.resume_from}")
+        previous = torch.load(args.resume_from, map_location=device, weights_only=True)
+        model.load_state_dict(previous["model_state"] if "model_state" in previous else previous)
+        print(f"Fine-tuning from {args.resume_from}", flush=True)
+    start_lr = 1e-4 if args.resume_from else 8e-4
+    optimizer = torch.optim.AdamW(model.parameters(), lr=start_lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
     loss_fn = nn.CrossEntropyLoss(weight=weight_tensor, label_smoothing=0.04)
 

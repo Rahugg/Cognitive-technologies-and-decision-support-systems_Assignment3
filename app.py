@@ -1,10 +1,14 @@
+import hashlib
+import io
 import threading
 import time
 import uuid
+from pathlib import Path
 
 import av
 import cv2
 import numpy as np
+import pandas as pd
 import streamlit as st
 from PIL import Image
 from streamlit_webrtc import webrtc_streamer
@@ -49,14 +53,68 @@ def show_result(result):
     st.write("Knowledge rules:", ", ".join(result["knowledge"]["rules"]))
 
 
+SAMPLE_DIR = Path(__file__).parent / "examples" / "open_source"
+UPLOAD_SAMPLES = {
+    "Laughing face": "laughing-face.jpg",
+    "Fearful face": "fear-face.jpg",
+    "Smiling face": "smiling-face.jpg",
+    "Sad face": "sad-face.jpg",
+    "Angry face": "angry-face.jpg",
+    "Surprised face": "surprised-face.jpg",
+}
+
+
+def show_photo_result(result):
+    perception = result["perception"]
+    attention = result["attention"]
+    decision = result["knowledge"]
+    prediction_col, confidence_col, quality_col = st.columns(3)
+    prediction_col.metric("Top expression", perception["emotion"].title())
+    confidence_col.metric("Confidence", f"{perception['confidence']:.0%}")
+    quality_col.metric("Photo quality", f"{perception['quality_score']:.2f} / 1.00")
+
+    if not attention["accepted"]:
+        st.error(f"Image not accepted: {attention['reason']}. Try a brighter, sharper photo with one face centered.")
+    elif decision["label"] == "uncertain":
+        st.warning("Image accepted, but the model is unsure. Try a clearer face photo.")
+    else:
+        st.success(f"Image accepted · result: **{decision['label'].title()}**")
+
+    st.caption(f"Knowledge result: {decision['label']} · Action: {decision['action']}")
+    probabilities = perception["probabilities"]
+    st.subheader("Emotion scores")
+    score_frame = pd.DataFrame({"Emotion": list(probabilities), "Confidence": list(probabilities.values())})
+    score_frame = score_frame.sort_values("Confidence", ascending=True)
+    st.bar_chart(score_frame, x="Emotion", y="Confidence", horizontal=True)
+
+    with st.expander("Technical details", expanded=False):
+        details_left, details_right = st.columns(2)
+        with details_left:
+            st.markdown("**Attention**")
+            st.write(f"Status: {'Accepted' if attention['accepted'] else 'Rejected'}")
+            st.write(f"Reason: {attention['reason']}")
+            st.write(f"Relevance: {attention['relevance']:.2f}")
+            st.markdown("**Memory**")
+            st.write(f"Recent accepted images in this session: {result['memory']['short_term_size']}")
+        with details_right:
+            st.markdown("**Knowledge rules**")
+            for rule in decision["rules"]:
+                st.write(f"- {rule}")
+            st.markdown("**Perception**")
+            st.write(f"Face detected: {'Yes' if perception['face_found'] else 'No'}")
+            st.write(f"Brightness: {perception['brightness']:.2f} · Sharpness: {perception['sharpness']:.1f}")
+
+
 with st.sidebar:
     st.session_state.setdefault("camera_session_id", f"live-{uuid.uuid4().hex[:8]}")
-    session_id = st.text_input("Session ID", key="camera_session_id").strip()
-    st.write(f"Quality threshold: {QUALITY_THRESHOLD:.2f}")
-    st.write(f"Confidence threshold: {CONFIDENCE_THRESHOLD:.2f}")
-    st.info("Video is processed in memory. PostgreSQL stores prediction metadata only.")
+    with st.expander("Session and privacy", expanded=False):
+        session_id = st.text_input("Session ID", key="camera_session_id").strip()
+        st.write(f"Quality threshold: {QUALITY_THRESHOLD:.2f}")
+        st.write(f"Confidence threshold: {CONFIDENCE_THRESHOLD:.2f}")
+        st.info("Photos and video are processed in memory. PostgreSQL stores prediction metadata only.")
+    session_id = st.session_state.get("camera_session_id", "").strip()
 
-live_tab, upload_tab = st.tabs(["Live camera", "Upload image"])
+live_tab, upload_tab = st.tabs(["Live camera", "Upload a photo"])
 
 with live_tab:
     st.write("Click **START**, allow camera access, then change your facial expression.")
@@ -145,29 +203,63 @@ with live_tab:
         st.error(camera_state["error"])
 
 with upload_tab:
-    uploaded = st.file_uploader("Upload a face image", type=["jpg", "jpeg", "png"])
-    if uploaded:
-        rgb = np.asarray(Image.open(uploaded).convert("RGB"))
-        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        left, right = st.columns([1, 1.2])
-        left.image(rgb, caption="Uploaded input", use_container_width=True)
+    st.subheader("Check a face photo")
+    st.write("Choose a photo from your device or use one of the included demo images.")
+    st.caption("Use a clear, front-facing image with one face. JPG and PNG are supported.")
+
+    source = st.radio("Photo source", ["Upload a photo", "Try a demo image"], horizontal=True,
+                      key="photo_source")
+    image_bytes = None
+    image_name = None
+
+    if source == "Upload a photo":
+        uploaded = st.file_uploader(
+            "Choose or drop a photo here", type=["jpg", "jpeg", "png"],
+            help="The photo is processed by this local app. Only prediction metadata are stored.",
+        )
+        if uploaded is not None:
+            image_bytes = uploaded.getvalue()
+            image_name = uploaded.name
+    else:
+        image_name = st.selectbox("Choose an example", list(UPLOAD_SAMPLES))
+        sample_path = SAMPLE_DIR / UPLOAD_SAMPLES[image_name]
+        if sample_path.exists():
+            image_bytes = sample_path.read_bytes()
+            st.caption("These synthetic demo faces are CC0 examples. The model prediction can differ from the visual label.")
+        else:
+            st.error("Demo images are missing. Rebuild the app with `docker compose up --build -d app`.")
+
+    if image_bytes:
+        image_key = hashlib.sha256(image_bytes).hexdigest()
         try:
-            result = load_system().process(bgr, session_id or "upload-demo", require_face=True)
-            with right:
-                show_result(result)
-                st.subheader("Perception")
-                st.json({k: v for k, v in result["perception"].items()
-                         if k != "probabilities"})
-                st.bar_chart({"emotion": list(result["perception"]["probabilities"]),
-                              "probability": list(result["perception"]["probabilities"].values())},
-                             x="emotion", y="probability")
-                st.subheader("Attention")
-                st.json(result["attention"])
-                st.subheader("Memory")
-                st.json({"previous": result["memory"]["previous"],
-                         "short_term_size": result["memory"]["short_term_size"]})
-                st.subheader("Knowledge rules")
-                for rule in result["knowledge"]["rules"]:
-                    st.write("-", rule)
+            rgb = np.asarray(Image.open(io.BytesIO(image_bytes)).convert("RGB"))
         except Exception as error:
-            st.error(str(error))
+            st.error(f"Could not read this image: {error}")
+            rgb = None
+
+        if rgb is not None:
+            preview_col, result_col = st.columns([0.9, 1.1], gap="large")
+            with preview_col:
+                st.image(rgb, caption=image_name, use_container_width=True)
+                analyze = st.button("Analyze photo", type="primary", use_container_width=True,
+                                    key=f"analyze-{image_key[:12]}")
+            saved = st.session_state.get("photo_analysis")
+            if analyze:
+                try:
+                    bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                    # Keep still-image analysis separate from the camera session so old live
+                    # frames cannot bias its short-term smoothed prediction.
+                    upload_session = f"upload-{image_key[:12]}"
+                    result = load_system().process(bgr, upload_session, require_face=True)
+                    saved = {"key": image_key, "result": result}
+                    st.session_state.photo_analysis = saved
+                except Exception as error:
+                    st.error(f"Could not analyze this image: {error}")
+                    saved = None
+
+            with result_col:
+                if saved and saved["key"] == image_key:
+                    st.markdown("### Result")
+                    show_photo_result(saved["result"])
+                else:
+                    st.info("Your photo is ready. Select **Analyze photo** to see the result.")
