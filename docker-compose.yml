@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: emotiondb
+      POSTGRES_USER: emotion
+      POSTGRES_PASSWORD: emotion
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emotion -d emotiondb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://emotion:emotion@db:5432/emotiondb
+      MODEL_PATH: /workspace/models/emotion_cnn.pt
+      DATA_DIR: /workspace/data
+      QUALITY_THRESHOLD: "0.45"
+      CONFIDENCE_THRESHOLD: "0.55"
+      STM_WINDOW: "5"
+    volumes:
+      - ./data:/workspace/data
+      - ./models:/workspace/models
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+
+  dataset-downloader:
+    build: .
+    profiles: ["data"]
+    environment:
+      KAGGLE_API_TOKEN: ${KAGGLE_API_TOKEN:-}
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+      KAGGLE_KEY: ${KAGGLE_KEY:-}
+    volumes:
+      - ./data:/workspace/data
+    command: >-
+      sh -lc "python scripts/download_datasets.py --datasets fer2013 ckplus rafdb &&
+      python scripts/prepare_dataset.py --max-per-class-source ${MAX_PER_CLASS_SOURCE:-1500} --seed ${SEED:-42}"
+
+  trainer:
+    build: .
+    profiles: ["train"]
+    environment:
+      DATA_DIR: /workspace/data
+      MODEL_PATH: /workspace/models/emotion_cnn.pt
+      SEED: ${SEED:-42}
+    volumes:
+      - ./data:/workspace/data
+      - ./models:/workspace/models
+    command: python scripts/train.py --epochs ${EPOCHS:-5}
+
+  jupyter:
+    build: .
+    profiles: ["notebook"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://emotion:emotion@db:5432/emotiondb
+      MODEL_PATH: /workspace/models/emotion_cnn.pt
+      DATA_DIR: /workspace/data
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8888:8888"
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token=''
+
+volumes:
+  postgres_data:

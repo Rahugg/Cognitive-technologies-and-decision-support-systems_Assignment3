@@ -1,0 +1,1 @@
+"""Cognitive emotion recognition prototype."""
