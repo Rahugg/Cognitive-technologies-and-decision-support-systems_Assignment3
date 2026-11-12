@@ -68,7 +68,9 @@ class CognitiveEmotionSystem:
             "memory": {"previous": {"emotion": state.previous_emotion} if state.previous_emotion else None,
                        "current": None, "smoothed_prediction": smoothed,
                        "short_term_size": len(self.memory.recent(session_id))},
-            "knowledge": {"label": state.label, "action": state.recommended,
+            "knowledge": {"label": state.label,
+                          "action": "request_more_data" if state.label in ("insufficient_data", "uncertain")
+                          else state.recommended,
                           "confidence": state.smoothed_confidence, "rules": state.rules},
             "state": state,
         }
