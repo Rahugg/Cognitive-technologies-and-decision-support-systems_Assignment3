@@ -27,7 +27,7 @@ services:
       MODEL_PATH: /workspace/models/emotion_cnn.pt
       DATA_DIR: /workspace/data
       QUALITY_THRESHOLD: "0.45"
-      CONFIDENCE_THRESHOLD: "0.25"
+      CONFIDENCE_THRESHOLD: "0.55"
       STM_WINDOW: "5"
     volumes:
       - ./data:/workspace/data
