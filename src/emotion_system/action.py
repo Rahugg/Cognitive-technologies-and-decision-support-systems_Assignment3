@@ -26,10 +26,11 @@ def run(state: CogState, memory) -> CogState:
               "ranking": [{"alternative": r["alternative"], "score": round(r["score"], 4)}
                           for r in state.ranking]}
     written = memory.save_decision(state.session_id, record)
+    decision_id = getattr(memory, "last_decision_id", None)
     state.explanation.append(f"Action: {'recorded in PostgreSQL' if written else 'kept in memory only (no DB)'}.")
     state.report = {**record, "session_id": state.session_id, "text": text, "label": state.label,
                     "rules": state.rules, "reasoning_steps": state.reasoning_steps,
-                    "explanation": state.explanation, "db_written": written,
+                    "explanation": state.explanation, "explanation": state.explanation, "db_written": written, "decision_id": decision_id,
                     "limitation": LIMITATION,
                     "created_at": datetime.now(timezone.utc).isoformat()}
     return state

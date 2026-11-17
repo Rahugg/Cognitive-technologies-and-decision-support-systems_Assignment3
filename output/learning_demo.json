@@ -1,0 +1,487 @@
+{
+  "simulated_tutor": true,
+  "feedback_per_emotion": 5,
+  "learning_summary": {
+    "processed": 35,
+    "updated": 35,
+    "skipped": 0,
+    "version": 2
+  },
+  "matrix_before": {
+    "angry": [
+      0.1,
+      0.3,
+      0.8,
+      0.5,
+      0.6
+    ],
+    "disgust": [
+      0.2,
+      0.3,
+      0.4,
+      0.4,
+      0.7
+    ],
+    "fear": [
+      0.1,
+      0.4,
+      0.5,
+      0.6,
+      0.8
+    ],
+    "happy": [
+      0.9,
+      0.2,
+      0.1,
+      0.2,
+      0.2
+    ],
+    "neutral": [
+      0.8,
+      0.3,
+      0.1,
+      0.2,
+      0.3
+    ],
+    "sad": [
+      0.2,
+      0.3,
+      0.6,
+      0.5,
+      0.8
+    ],
+    "surprise": [
+      0.3,
+      0.8,
+      0.2,
+      0.2,
+      0.5
+    ]
+  },
+  "matrix_after": {
+    "angry": [
+      0.0,
+      0.3,
+      0.8,
+      0.75,
+      0.6
+    ],
+    "disgust": [
+      0.0,
+      0.3,
+      0.4,
+      0.4,
+      0.95
+    ],
+    "fear": [
+      0.35,
+      0.4,
+      0.5,
+      0.35,
+      0.8
+    ],
+    "happy": [
+      0.65,
+      0.45,
+      0.1,
+      0.2,
+      0.2
+    ],
+    "neutral": [
+      0.55,
+      0.55,
+      0.1,
+      0.2,
+      0.3
+    ],
+    "sad": [
+      0.0,
+      0.3,
+      0.6,
+      0.5,
+      1.0
+    ],
+    "surprise": [
+      0.55,
+      0.55,
+      0.2,
+      0.2,
+      0.5
+    ]
+  },
+  "before": {
+    "angry": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          0.65
+        ],
+        [
+          "easier_task",
+          0.611
+        ],
+        [
+          "pause",
+          0.6
+        ],
+        [
+          "ask_directly",
+          0.524
+        ],
+        [
+          "re_explain",
+          0.517
+        ]
+      ],
+      "decision_id": 2,
+      "tutor_choice": "easier_task"
+    },
+    "disgust": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          0.65
+        ],
+        [
+          "ask_directly",
+          0.613
+        ],
+        [
+          "easier_task",
+          0.545
+        ],
+        [
+          "re_explain",
+          0.484
+        ],
+        [
+          "pause",
+          0.385
+        ]
+      ],
+      "decision_id": 3,
+      "tutor_choice": "ask_directly"
+    },
+    "fear": {
+      "recommended": "easier_task",
+      "ranking": [
+        [
+          "easier_task",
+          0.653
+        ],
+        [
+          "continue",
+          0.65
+        ],
+        [
+          "ask_directly",
+          0.613
+        ],
+        [
+          "re_explain",
+          0.562
+        ],
+        [
+          "pause",
+          0.444
+        ]
+      ],
+      "decision_id": 4,
+      "tutor_choice": "continue"
+    },
+    "happy": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          1.0
+        ],
+        [
+          "re_explain",
+          0.46
+        ],
+        [
+          "easier_task",
+          0.454
+        ],
+        [
+          "ask_directly",
+          0.317
+        ],
+        [
+          "pause",
+          0.25
+        ]
+      ],
+      "decision_id": 5,
+      "tutor_choice": "re_explain"
+    },
+    "neutral": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          1.0
+        ],
+        [
+          "re_explain",
+          0.516
+        ],
+        [
+          "easier_task",
+          0.461
+        ],
+        [
+          "ask_directly",
+          0.374
+        ],
+        [
+          "pause",
+          0.25
+        ]
+      ],
+      "decision_id": 6,
+      "tutor_choice": "re_explain"
+    },
+    "sad": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          0.65
+        ],
+        [
+          "ask_directly",
+          0.613
+        ],
+        [
+          "easier_task",
+          0.58
+        ],
+        [
+          "pause",
+          0.475
+        ],
+        [
+          "re_explain",
+          0.473
+        ]
+      ],
+      "decision_id": 7,
+      "tutor_choice": "ask_directly"
+    },
+    "surprise": {
+      "recommended": "re_explain",
+      "ranking": [
+        [
+          "re_explain",
+          0.767
+        ],
+        [
+          "continue",
+          0.708
+        ],
+        [
+          "ask_directly",
+          0.452
+        ],
+        [
+          "easier_task",
+          0.411
+        ],
+        [
+          "pause",
+          0.251
+        ]
+      ],
+      "decision_id": 8,
+      "tutor_choice": "continue"
+    }
+  },
+  "after": {
+    "angry": {
+      "recommended": "easier_task",
+      "ranking": [
+        [
+          "easier_task",
+          0.739
+        ],
+        [
+          "continue",
+          0.65
+        ],
+        [
+          "pause",
+          0.6
+        ],
+        [
+          "re_explain",
+          0.553
+        ],
+        [
+          "ask_directly",
+          0.54
+        ]
+      ],
+      "decision_id": 9
+    },
+    "disgust": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          0.65
+        ],
+        [
+          "ask_directly",
+          0.613
+        ],
+        [
+          "easier_task",
+          0.556
+        ],
+        [
+          "re_explain",
+          0.528
+        ],
+        [
+          "pause",
+          0.395
+        ]
+      ],
+      "decision_id": 10
+    },
+    "fear": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          0.65
+        ],
+        [
+          "ask_directly",
+          0.613
+        ],
+        [
+          "re_explain",
+          0.463
+        ],
+        [
+          "easier_task",
+          0.418
+        ],
+        [
+          "pause",
+          0.365
+        ]
+      ],
+      "decision_id": 11
+    },
+    "happy": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          1.0
+        ],
+        [
+          "re_explain",
+          0.646
+        ],
+        [
+          "easier_task",
+          0.475
+        ],
+        [
+          "ask_directly",
+          0.348
+        ],
+        [
+          "pause",
+          0.25
+        ]
+      ],
+      "decision_id": 12
+    },
+    "neutral": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          0.989
+        ],
+        [
+          "re_explain",
+          0.767
+        ],
+        [
+          "easier_task",
+          0.487
+        ],
+        [
+          "ask_directly",
+          0.442
+        ],
+        [
+          "pause",
+          0.25
+        ]
+      ],
+      "decision_id": 13
+    },
+    "sad": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          0.65
+        ],
+        [
+          "ask_directly",
+          0.613
+        ],
+        [
+          "easier_task",
+          0.582
+        ],
+        [
+          "re_explain",
+          0.523
+        ],
+        [
+          "pause",
+          0.455
+        ]
+      ],
+      "decision_id": 14
+    },
+    "surprise": {
+      "recommended": "continue",
+      "ranking": [
+        [
+          "continue",
+          0.986
+        ],
+        [
+          "re_explain",
+          0.767
+        ],
+        [
+          "ask_directly",
+          0.591
+        ],
+        [
+          "easier_task",
+          0.411
+        ],
+        [
+          "pause",
+          0.252
+        ]
+      ],
+      "decision_id": 15
+    }
+  }
+}
