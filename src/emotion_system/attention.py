@@ -1,5 +1,8 @@
+from .config import CONFIDENCE_THRESHOLD, QUALITY_THRESHOLD
+
+
 class Attention:
-    def __init__(self, quality_threshold=0.45, confidence_threshold=0.25):
+    def __init__(self, quality_threshold=QUALITY_THRESHOLD, confidence_threshold=CONFIDENCE_THRESHOLD):
         self.quality_threshold = quality_threshold
         self.confidence_threshold = confidence_threshold
 

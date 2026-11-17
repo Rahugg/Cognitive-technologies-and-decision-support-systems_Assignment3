@@ -6,13 +6,8 @@ APP_URL := http://localhost:8501
 # One command for first setup and later launches.
 run:
 	@docker info >/dev/null 2>&1 || { echo "Docker is not running. Start Docker Desktop and try again."; exit 1; }
-	@if [ ! -s data/processed/index.csv ]; then \
-		echo "Dataset index missing; downloading and preparing FER-2013, CK+, and RAF-DB..."; \
-		$(COMPOSE) --profile data run --rm dataset-downloader; \
-	fi
 	@if [ ! -s models/emotion_cnn.pt ]; then \
-		echo "Trained model missing; training the CNN..."; \
-		$(COMPOSE) --profile train run --rm trainer; \
+		echo "Restore models/emotion_cnn.pt from the final submission ZIP."; exit 1; \
 	fi
 	$(COMPOSE) up --build -d app
 	@attempt=0; until curl --silent --fail --output /dev/null $(APP_URL); do \

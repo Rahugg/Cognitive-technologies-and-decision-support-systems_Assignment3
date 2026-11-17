@@ -24,7 +24,6 @@ from src.emotion_system.memory import Memory  # noqa: E402
 from src.emotion_system.state import CogState  # noqa: E402
 
 FEEDBACK_PER_EMOTION = 5
-UNREACHABLE_DB = "postgresql://nobody:nobody@localhost:1/none"  # forces in-memory fallback
 
 
 def peaked(emotion, p=0.9):
@@ -60,7 +59,7 @@ def main():
     parser.add_argument("--use-db", action="store_true", help="store results in PostgreSQL")
     args = parser.parse_args()
 
-    memory = Memory(DATABASE_URL if args.use_db else UNREACHABLE_DB)
+    memory = Memory(DATABASE_URL if args.use_db else "")
     memory.utility = copy.deepcopy(UTILITY)  # always start the demo from the original matrix
     print(f"Storage: {'PostgreSQL' if memory.db_ok else 'in-memory only'}\n")
 

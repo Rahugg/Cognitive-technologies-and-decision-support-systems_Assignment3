@@ -1,4 +1,8 @@
 
+from copy import deepcopy
+from unittest.mock import MagicMock
+
+import psycopg
 import pytest
 
 from src.emotion_system.config import ALTERNATIVES, UTILITY
@@ -12,8 +16,7 @@ from src.emotion_system.memory import Memory
 
 @pytest.fixture
 def memory():
-    m = Memory("postgresql://nobody:nobody@localhost:1/none")
-    # Unreachable database -> in-memory fallback
+    m = Memory("")
     assert not m.db_ok
     return m
 
@@ -152,3 +155,40 @@ def test_reset_utility_restores_original_matrix(memory):
 
     assert versions[-1]["version"] == version
     assert versions[-1]["matrix"] == UTILITY
+
+
+def test_tutor_can_log_a_choice_on_a_rejected_frame(memory):
+    result = submit_feedback(memory, 's', None, 'ask_directly', 'continue', False)
+    assert result['feedback']['emotion'] is None
+    assert result['updated'] == 0
+    assert memory.utility == UTILITY
+    with pytest.raises(ValueError):
+        memory.save_feedback('s', None, 'ask_directly', 'continue', True)
+
+
+def test_saturated_feedback_does_not_publish_an_unchanged_version(memory):
+    memory.utility['happy'][idx('continue')] = 1.0
+    result = submit_feedback(memory, 's', 'happy', 'continue', 'continue', True)
+    assert result['updated'] == 0
+    assert result['unchanged'] == 1
+    assert result['version'] is None
+    assert memory.pending_feedback() == []
+
+
+def test_database_commit_failure_leaves_feedback_and_utility_unchanged(memory, monkeypatch):
+    record = memory.save_feedback("s", "angry", "continue", "pause", True)
+    changed = deepcopy(memory.utility)
+    changed["angry"][idx("pause")] = 0.85
+    connection = MagicMock()
+    connection.__enter__.return_value = connection
+    connection.__exit__.side_effect = psycopg.OperationalError("Could not commit the transaction")
+    monkeypatch.setattr(memory, "_connect", lambda: connection)
+    memory.db_ok = True
+
+    with pytest.raises(psycopg.OperationalError):
+        memory.complete_feedback_batch([record["id"]], changed)
+
+    assert connection.execute.call_count == 2
+    assert memory.utility == UTILITY
+    assert memory.utility_history == []
+    assert not memory.feedback[0]["processed"]

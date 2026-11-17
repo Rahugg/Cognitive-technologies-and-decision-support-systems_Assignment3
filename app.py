@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from PIL import Image, ImageOps, UnidentifiedImageError
+from psycopg import Error as DatabaseError
 from streamlit_webrtc import webrtc_streamer
 
 from dss.model import rank
@@ -105,6 +106,10 @@ def show_dss(state, prefix):
     alternatives = state.alternatives
     matrix = [data["values"][alternative] for alternative in alternatives]
     defaults = [round(weight * 100) for weight in data["weights"]]
+    check_in = decision.needs_check_in(state)
+    if check_in:
+        st.warning(f"Recommended: **{ACTION_LABELS[state.recommended]}**. "
+                   "The frame gives insufficient evidence for a teaching intervention.")
 
     st.subheader("What-if weights")
     st.caption("Change the weights to compare teaching actions for this frame. We normalize the weights to 100%.")
@@ -123,7 +128,10 @@ def show_dss(state, prefix):
 
     result = rank(matrix, weights, types)
     best = recommendation(result, alternatives)
-    if best == state.recommended:
+    if check_in:
+        st.info(f"First in the WSM comparison: **{ACTION_LABELS[best]}**. "
+                "The weights only change the score comparison for this frame.")
+    elif best == state.recommended:
         st.success(f"Recommended with these weights: **{ACTION_LABELS[best]}**")
     else:
         st.success(f"What-if recommendation: **{ACTION_LABELS[best]}**")
@@ -134,7 +142,7 @@ def show_dss(state, prefix):
     comparison = result["comparison"]
     runner = ACTION_LABELS[alternatives[comparison["runner_up"]]]
     if abs(comparison["margin"]) < 1e-12:
-        st.write(f"Tied with “{runner}”. The model uses the listed alternative order to break equal scores.")
+        st.write(f"The first-ranked action ties with “{runner}”. The model breaks ties by alternative order.")
     else:
         deltas = sorted(zip(criteria, comparison["contributions"]), key=lambda item: -item[1])
         name, advantage = deltas[0]
@@ -142,7 +150,7 @@ def show_dss(state, prefix):
         if deltas[-1][1] < -1e-12:
             name, disadvantage = deltas[-1]
             why += f", while {CRITERION_LABELS[name].lower()} favors the runner-up ({disadvantage:+.3f})"
-        st.write(f"Leads “{runner}” by **{comparison['margin']:.3f}**. {why}.")
+        st.write(f"The first-ranked action leads “{runner}” by **{comparison['margin']:.3f}**. {why}.")
 
     table = ranking_table(result, alternatives, criteria)
     table["Rank"] = table["Rank"].astype(str)
@@ -175,6 +183,8 @@ def show_learning(state, current, weights, system, lock, prefix):
         version = summary["version"]
         if summary["updated"]:
             st.success(f"Feedback saved. Utility matrix version {version} recorded.")
+        elif summary["unchanged"]:
+            st.info("Feedback saved. The affected utility values were already at their limits.")
         else:
             st.info("Feedback saved. The expression was unconfirmed, so the utility matrix stayed the same.")
         st.write(f"**{saved['label']}** → **{saved['choice']}** chosen by the tutor")
@@ -189,7 +199,8 @@ def show_learning(state, current, weights, system, lock, prefix):
     if current is None:
         st.info("Set a positive DSS weight before recording a tutoring decision.")
         return
-    recommended = recommendation(current, state.alternatives)
+    recommended = (state.recommended if decision.needs_check_in(state)
+                   else recommendation(current, state.alternatives))
     st.write(f"Current DSS recommendation: **{ACTION_LABELS[recommended]}**. Choose what you did as the tutor.")
     with st.form(key):
         selected = st.selectbox("Tutor's action", state.alternatives, index=None,
@@ -205,12 +216,16 @@ def show_learning(state, current, weights, system, lock, prefix):
         return
 
     data = state.criteria_matrix
-    with lock:
-        # Compare the exact frame and weights on either side of this update.
-        before = decision.run(replace(state, explanation=[]), system.memory)
-        summary = learning.submit_feedback(system.memory, state.session_id, report["emotion"],
-                                           recommended, selected, confirmed, report["decision_id"])
-        after = decision.run(replace(state, explanation=[]), system.memory)
+    try:
+        with lock:
+            # Compare the exact frame and weights on either side of this update.
+            before = decision.run(replace(state, explanation=[]), system.memory)
+            summary = learning.submit_feedback(system.memory, state.session_id, report["emotion"],
+                                               recommended, selected, confirmed, report["decision_id"])
+            after = decision.run(replace(state, explanation=[]), system.memory)
+    except DatabaseError:
+        st.error("The database is unavailable. Reconnect it and analyze a frame to process any queued feedback.")
+        return
     before_rank, after_rank = [rank([snapshot.criteria_matrix["values"][alt] for alt in state.alternatives],
                                    weights, data["types"]) for snapshot in (before, after)]
     table = pd.DataFrame([
@@ -268,7 +283,7 @@ def show_cycle(result, prefix, system, lock):
             st.write(step)
     with tabs[5]:
         st.write(f"**{ACTION_LABELS[state.recommended]}** · Reliability {state.criteria_matrix['reliability']:.2f}")
-        st.caption("Saved ranking at the default analysis weights.")
+        st.caption("WSM ranking at the default weights. When evidence is insufficient, the app recommends checking in.")
         table = pd.DataFrame([{"Rank": row["rank"], "Alternative": ACTION_LABELS[row["alternative"]],
                                "Score": row["score"]} for row in state.ranking])
         st.dataframe(table.round(3), hide_index=True, use_container_width=True)
@@ -312,7 +327,7 @@ def photo_workspace(system, lock, session_id):
             with lock:
                 bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                 result = system.process(bgr, f"{session_id}-photo-{image_key}", require_face=True)
-        except (cv2.error, RuntimeError, ValueError) as error:
+        except (cv2.error, DatabaseError, RuntimeError, ValueError) as error:
             st.error(f"Could not analyze this frame: {error}")
             st.session_state.pop("photo_analysis", None)
         else:

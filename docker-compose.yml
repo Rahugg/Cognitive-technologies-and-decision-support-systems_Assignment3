@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
 
   app:
     build:
@@ -33,7 +33,7 @@ services:
       - ./data:/workspace/data
       - ./models:/workspace/models
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     restart: unless-stopped
 
   dataset-downloader:

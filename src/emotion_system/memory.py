@@ -175,19 +175,20 @@ class Memory:
         The id of the new decision is available as self.last_decision_id.
         """
         entry = {"session_id": session_id, **record}
-        self.decisions.append(entry)
         if not self.db_ok:
-            entry["id"] = len(self.decisions)
+            entry["id"] = len(self.decisions) + 1
+            self.decisions.append(entry)
             self.last_decision_id = entry["id"]
             return False
         with self._connect() as conn:
             row = conn.execute(
                 "INSERT INTO decisions (session_id, recommended, emotion, reliability, "
                 "trend, accepted, ranking) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-                (session_id, record["recommended"], record["emotion"], record["reliability"],
+                (session_id, record["recommended"], record["emotion"] or "unavailable", record["reliability"],
                  record["trend"], record["accepted"], Jsonb(record["ranking"])),
             ).fetchone()
         entry["id"] = row["id"]
+        self.decisions.append(entry)
         self.last_decision_id = row["id"]
         return True
 
@@ -198,12 +199,12 @@ class Memory:
                       emotion_correct, decision_id=None):
         """Store one piece of tutor feedback and return it as a dict.
 
-        emotion: emotion the system recognized for the decision.
+        emotion: expression estimated by the system, or None for a rejected frame.
         recommended: action the system recommended.
         selected: action the tutor actually chose.
         emotion_correct: did the tutor agree with the recognized emotion?
         """
-        if emotion not in EMOTIONS:
+        if emotion not in EMOTIONS and (emotion is not None or emotion_correct):
             raise ValueError(f"Unknown emotion: {emotion!r}")
         if recommended not in ALTERNATIVES:
             raise ValueError(f"Unknown recommended action: {recommended!r}")
@@ -225,7 +226,7 @@ class Memory:
                 row = conn.execute(
                     "INSERT INTO feedback (decision_id, session_id, emotion, recommended, "
                     "selected, emotion_correct) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                    (decision_id, session_id, emotion, recommended, selected,
+                    (decision_id, session_id, emotion or "unavailable", recommended, selected,
                      record["emotion_correct"]),
                 ).fetchone()
             record["id"] = row["id"]
@@ -246,36 +247,52 @@ class Memory:
             ).fetchall()
         for row in rows:
             row["created_at"] = row["created_at"].isoformat()
+            if row["emotion"] == "unavailable":
+                row["emotion"] = None
         return rows
 
-    def mark_feedback_processed(self, feedback_ids):
+    def complete_feedback_batch(self, feedback_ids, matrix=None, reason=""):
+        """Persist the new utility version and processed flags in the same transaction."""
         ids = list(feedback_ids)
         if not ids:
-            return
+            return None
+        version = None
+        if self.db_ok:
+            with self._connect() as conn:
+                if matrix is not None:
+                    version = self._insert_utility_version(conn, matrix, reason)
+                conn.execute("UPDATE feedback SET processed = TRUE WHERE id = ANY(%s)", (ids,))
+        if matrix is not None:
+            self.utility = matrix
+            version = self._record_utility_version(matrix, reason, version)
         for item in self.feedback:
             if item["id"] in ids:
                 item["processed"] = True
-        if self.db_ok:
-            with self._connect() as conn:
-                conn.execute("UPDATE feedback SET processed = TRUE WHERE id = ANY(%s)", (ids,))
+        return version
 
     # ------------------------------------------------------------------
     # Utility matrix versions (Role B)
     # ------------------------------------------------------------------
     def save_utility_version(self, reason=""):
         """Snapshot the current matrix M and return its version number."""
-        snapshot = copy.deepcopy(self.utility)
+        version = None
         if self.db_ok:
             with self._connect() as conn:
-                row = conn.execute(
-                    "INSERT INTO utility_versions (matrix, reason) VALUES (%s, %s) RETURNING id",
-                    (Jsonb(snapshot), reason),
-                ).fetchone()
-            version = row["id"]
-        else:
+                version = self._insert_utility_version(conn, self.utility, reason)
+        return self._record_utility_version(self.utility, reason, version)
+
+    @staticmethod
+    def _insert_utility_version(conn, matrix, reason):
+        return conn.execute(
+            "INSERT INTO utility_versions (matrix, reason) VALUES (%s, %s) RETURNING id",
+            (Jsonb(matrix), reason),
+        ).fetchone()["id"]
+
+    def _record_utility_version(self, matrix, reason, version):
+        if version is None:
             version = len(self.utility_history) + 1
         self.utility_history.append(
-            {"version": version, "matrix": snapshot, "reason": reason, "created_at": _now()})
+            {"version": version, "matrix": copy.deepcopy(matrix), "reason": reason, "created_at": _now()})
         return version
 
     def reset_utility(self, reason="reset to expert matrix"):
