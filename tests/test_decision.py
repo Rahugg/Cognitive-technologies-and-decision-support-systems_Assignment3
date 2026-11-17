@@ -40,3 +40,17 @@ def test_learning_updated_matrix_is_used(make_state):
     state = reasoning.run(make_state("happy"), memory)
     memory.utility["happy"][2] = 5.0  # pause becomes very useful for happy
     assert decision.run(state, memory).criteria_matrix["values"]["pause"][0] > 4
+
+
+def test_rejected_frame_keeps_check_in_despite_ranked_history(make_state):
+    state = run(make_state('happy', 0.85, 0.36, accepted=False),
+                [frame('happy'), frame('happy', accepted=False)])
+    assert state.ranking[0]['alternative'] == 'continue'
+    assert state.recommended == 'ask_directly'
+
+
+def test_no_face_has_zero_reliability_even_with_history(make_state):
+    state = make_state('happy', 0.95, 0.9, accepted=False)
+    state.face_found = False
+    state = run(state, [frame('happy')])
+    assert state.criteria_matrix['reliability'] == 0

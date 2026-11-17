@@ -1,6 +1,7 @@
 import argparse
 import csv
 import json
+from hashlib import sha256
 from pathlib import Path
 import sys
 
@@ -14,6 +15,19 @@ from torch.utils.data import DataLoader, Dataset
 
 from src.emotion_system.config import DATA_DIR, EMOTIONS, MODEL_PATH
 from src.emotion_system.model import load_model
+
+
+def image_path(value):
+    path = Path(value)
+    docker_data = Path("/workspace/data")
+    if path.is_relative_to(docker_data) and not path.is_file():
+        return DATA_DIR / path.relative_to(docker_data)
+    return path
+
+
+def input_pixels(value):
+    with Image.open(image_path(value)) as image:
+        return cv2.resize(np.asarray(image.convert("L")), (48, 48), interpolation=cv2.INTER_AREA)
 
 
 class TestDataset(Dataset):
@@ -33,24 +47,8 @@ class TestDataset(Dataset):
 
     def __getitem__(self, index):
         row = self.frame.iloc[index]
-        image_path = Path(row["path"])
-
-        if not image_path.is_absolute():
-            image_path = Path.cwd() / image_path
-
-        if not image_path.exists():
-            raise FileNotFoundError(f"Test image not found: {image_path}")
-
-        with Image.open(image_path) as source:
-            image = source.convert("L")
-            pixels = cv2.resize(
-                np.asarray(image),
-                (48, 48),
-                interpolation=cv2.INTER_AREA,
-            )
-
         # Equivalent to transforms.ToTensor() for a grayscale PIL image.
-        tensor = torch.from_numpy(pixels.copy()).float().unsqueeze(0) / 255.0
+        tensor = torch.from_numpy(input_pixels(row["path"])).float().unsqueeze(0) / 255.0
         label = self.label_to_index[row["label"]]
 
         return tensor, label
@@ -117,10 +115,43 @@ def evaluate(model, loader, device, emotions):
 
 def save_confusion_matrix(confusion, emotions, output_path):
     with output_path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
+        writer = csv.writer(file, lineterminator="\n")
         writer.writerow(["actual/predicted", *emotions])
         for emotion, row in zip(emotions, confusion):
             writer.writerow([emotion, *[int(value) for value in row]])
+
+
+def audit_overlap(index, test_frame):
+    """Remove exact matches at CNN input resolution and count known CK+ subject overlap."""
+    def fingerprint(path):
+        return sha256(input_pixels(path).tobytes()).digest()
+
+    prior = {fingerprint(path) for path in index.loc[index["split"] != "test", "path"]}
+    unique_test = set()
+    retained = []
+    overlaps = repeated = 0
+    for row_id, path in test_frame["path"].items():
+        digest = fingerprint(path)
+        if digest in prior:
+            overlaps += 1
+        elif digest in unique_test:
+            repeated += 1
+        else:
+            unique_test.add(digest)
+            retained.append(row_id)
+
+    audit = {"identical_to_train_or_validation": overlaps,
+             "duplicates_within_remaining_test": repeated}
+    if "source" in index:
+        def ck_subjects(frame):
+            files = frame.loc[frame["source"] == "ckplus", "path"].map(lambda path: Path(path).name)
+            return files.str.extract(r"^(S\d+)_", expand=False).dropna()
+
+        prior_subjects = set(ck_subjects(index[index["split"] != "test"]))
+        subjects = ck_subjects(test_frame.loc[retained])
+        audit["filtered_ckplus_subjects"] = subjects.nunique()
+        audit["filtered_ckplus_subjects_in_train_or_validation"] = len(set(subjects) & prior_subjects)
+    return test_frame.loc[retained], audit
 
 
 def main():
@@ -134,6 +165,7 @@ def main():
         help="Evaluate only the first N test images (0 means all).",
     )
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--audit-overlap", action="store_true", help="also evaluate after exact input deduplication")
     args = parser.parse_args()
 
     if args.limit < 0:
@@ -182,7 +214,9 @@ def main():
     results = {
         "evaluation_type": "limited_test_subset" if args.limit else "full_test_split",
         "checkpoint": Path(MODEL_PATH).name,
-        "dataset_index": "data/processed/index.csv",    
+        "checkpoint_sha256": sha256(Path(MODEL_PATH).read_bytes()).hexdigest(),
+        "dataset_index": "data/processed/index.csv",
+        "dataset_index_sha256": sha256(index_path.read_bytes()).hexdigest(),
         "device": str(device),
         "emotions": EMOTIONS,
         "metrics": overall,
@@ -210,6 +244,16 @@ def main():
     output_confusion = Path(MODEL_PATH).parent / f"emotion_cnn.confusion_matrix{partial}.csv"
 
     output_metrics.parent.mkdir(parents=True, exist_ok=True)
+    if args.audit_overlap:
+        filtered, audit = audit_overlap(index, test_frame)
+        filtered_loader = DataLoader(TestDataset(filtered, EMOTIONS), batch_size=args.batch_size)
+        audit["metrics"], filtered_confusion = evaluate(model, filtered_loader, device, EMOTIONS)
+        results["overlap_audit"] = audit
+        output_filtered = Path(MODEL_PATH).parent / f"emotion_cnn.deduplicated_confusion_matrix{partial}.csv"
+        save_confusion_matrix(filtered_confusion, EMOTIONS, output_filtered)
+        m = audit["metrics"]
+        print(f"Deduplicated test subset: {m['samples']} samples, accuracy {m['accuracy']:.4f}, "
+              f"macro F1 {m['macro_f1']:.4f}")
     output_metrics.write_text(
         json.dumps(results, indent=2),
         encoding="utf-8",

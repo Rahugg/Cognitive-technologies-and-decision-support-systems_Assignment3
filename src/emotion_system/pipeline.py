@@ -1,6 +1,6 @@
 from . import action, decision, learning, reasoning
 from .attention import Attention
-from .config import CONFIDENCE_THRESHOLD
+from .config import CONFIDENCE_THRESHOLD, QUALITY_THRESHOLD, STM_WINDOW
 from .knowledge import Knowledge
 from .memory import Memory
 from .perception import Perception
@@ -8,14 +8,14 @@ from .state import CogState
 
 
 class CognitiveEmotionSystem:
-    def __init__(self, model, emotions, database_url, quality_threshold=0.45,
-                 confidence_threshold=CONFIDENCE_THRESHOLD, memory_window=5, device="cpu"):
+    def __init__(self, model, emotions, database_url, quality_threshold=QUALITY_THRESHOLD,
+                 confidence_threshold=CONFIDENCE_THRESHOLD, memory_window=STM_WINDOW, device="cpu"):
         self.perception = Perception(model, emotions, device)
         self.attention = Attention(quality_threshold, confidence_threshold)
         self.memory = Memory(database_url, memory_window)
         self.knowledge = Knowledge()  # graph kept for reference; rules now run in Reasoning
 
-    def run_cycle(self, image, session_id, require_face=False) -> CogState:
+    def run_cycle(self, image, session_id, require_face=True) -> CogState:
         """Perception -> Attention -> Memory -> Reasoning -> Decision -> Action -> Learning."""
         state = CogState(session_id=session_id, image=image)
         perception = self.perception.process(image)
@@ -49,7 +49,7 @@ class CognitiveEmotionSystem:
         state.image = None  # raw pixels are never kept past the cycle
         return state
 
-    def process(self, image, session_id, require_face=False):
+    def process(self, image, session_id, require_face=True):
         """Backward-compatible dict for app.py and scripts/run_demo.py."""
         state = self.run_cycle(image, session_id, require_face)
         smoothed = {"emotion": max(state.smoothed_probs, key=state.smoothed_probs.get)

@@ -1,6 +1,6 @@
 # Demo images
 
-The face crops come from the CC0 illustration **Diverse Facial Expressions** on [Public Domain Pictures](https://www.publicdomainpictures.net/en/view-image.php?image=773242&picture=diverse-facial-expressions). The crops retain that license. These illustrations stand in for lesson frames. Their visual labels describe the artwork.
+The face crops come from the CC0 illustration **Diverse Facial Expressions** on [Public Domain Pictures](https://www.publicdomainpictures.net/en/view-image.php?image=773242&picture=diverse-facial-expressions). The crops retain that license. These AI-generated illustrations stand in for lesson frames. Their visual labels describe the artwork.
 
 `dark-smiling-face.jpg` uses the same crop as `smiling-face.jpg` with brightness reduced to 20% and a 2 px Gaussian blur. It exercises the low-quality path with an otherwise recognizable face.
 

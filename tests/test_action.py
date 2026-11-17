@@ -25,3 +25,10 @@ def test_text_mentions_top_criteria(make_state):
 def test_rejected_frame_text(make_state):
     state, _ = run(make_state(accepted=False), [frame("happy"), frame("angry", accepted=False)])
     assert "unreliable" in state.action and "ranked #" in state.action
+
+
+def test_rejected_report_does_not_assign_a_reliable_expression(make_state):
+    state, memory = run(make_state(accepted=False), [frame('angry', accepted=False)])
+    assert state.report['emotion'] is None
+    assert state.report['recommended'] == state.recommended == 'ask_directly'
+    assert memory.saved[0][1]['emotion'] is None

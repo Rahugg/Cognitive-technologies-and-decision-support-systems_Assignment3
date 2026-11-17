@@ -1,10 +1,13 @@
 import cv2
 import numpy as np
-import pandas as pd
+import sys
 import uuid
 from pathlib import Path
 
-from src.emotion_system.config import (CONFIDENCE_THRESHOLD, DATA_DIR, DATABASE_URL,
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from src.emotion_system.config import (CONFIDENCE_THRESHOLD, DATABASE_URL,
                                        MODEL_PATH, QUALITY_THRESHOLD, STM_WINDOW)
 from src.emotion_system.model import load_model
 from src.emotion_system.pipeline import CognitiveEmotionSystem
@@ -25,33 +28,32 @@ def show(title, result):
     print("Decision (DSS):", [(r["alternative"], round(r["score"], 3)) for r in state.ranking],
           "-> recommended:", state.recommended)
     print("Action:", state.action)
+    print(state.explanation[-1])
     print("Report: db_written =", state.report["db_written"])
 
 
 def main():
-    index_path = DATA_DIR / "processed/index.csv"
-    if index_path.exists():
-        sample_path = pd.read_csv(index_path).query("split == 'test'").iloc[0].path
-    else:  # clean machine: use the bundled demo image
-        sample_path = str(Path(__file__).resolve().parents[1] / "examples/open_source/smiling-face.jpg")
-    image = cv2.imread(sample_path)
-    if image is None:
-        raise SystemExit(f"Could not read sample image: {sample_path}")
+    samples = ROOT / "examples" / "open_source"
+    image = cv2.imread(str(samples / "smiling-face.jpg"))
+    severe = cv2.imread(str(samples / "dark-smiling-face.jpg"))
+    if image is None or severe is None:
+        raise SystemExit(f"Could not read both demo images in {samples}")
     device = "cuda" if __import__("torch").cuda.is_available() else "cpu"
     model, emotions = load_model(MODEL_PATH, device)
     system = CognitiveEmotionSystem(model, emotions, DATABASE_URL, QUALITY_THRESHOLD,
                                     CONFIDENCE_THRESHOLD, STM_WINDOW, device)
     session = f"assignment3-demo-{uuid.uuid4().hex[:8]}"
-    first = system.process(image, session)
-    show("Example 1: clear test image", first)
+    first = system.process(image, session, require_face=True)
+    show("Example 1: clear demo image", first)
     mild = cv2.GaussianBlur((image.astype(np.float32) * 0.90).clip(0, 255).astype(np.uint8), (3, 3), 0)
-    second = system.process(mild, session)
+    second = system.process(mild, session, require_face=True)
     show("Example 2: mildly degraded image, same session", second)
-    severe = cv2.GaussianBlur((image.astype(np.float32) * 0.03).clip(0, 255).astype(np.uint8), (31, 31), 0)
-    third = system.process(severe, session)
-    show("Example 3: heavily degraded image", third)
-    if third["attention"]["accepted"]:
-        raise RuntimeError("Low-quality demo failed its acceptance check; inspect the quality calculation.")
+    third = system.process(severe, session, require_face=True)
+    show("Example 3: dark image, same session", third)
+    if not first["attention"]["accepted"] or not second["attention"]["accepted"]:
+        raise RuntimeError("The clear and mildly degraded images must pass Attention.")
+    if third["attention"]["accepted"] or third["state"].recommended != "ask_directly":
+        raise RuntimeError("The dark image must trigger a check-in, even with earlier accepted frames.")
 
 
 if __name__ == "__main__":

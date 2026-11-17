@@ -1,6 +1,8 @@
 
 """Learning (Role B): updates utility matrix M from tutor feedback."""
 
+from copy import deepcopy
+
 from .config import ALTERNATIVES
 from .state import CogState
 
@@ -14,14 +16,18 @@ def _clamp(value: float) -> float:
 def apply_feedback(memory, learning_rate: float = LEARNING_RATE) -> dict:
     """Consume pending tutor feedback and update utility matrix M."""
     pending = memory.pending_feedback()
-    updated = skipped = 0
+    if not pending:
+        return {"processed": 0, "updated": 0, "skipped": 0, "unchanged": 0, "version": None}
+    utility = deepcopy(memory.utility)
+    updated = skipped = unchanged = 0
 
     for item in pending:
         if not item["emotion_correct"]:
             skipped += 1
             continue
 
-        row = memory.utility[item["emotion"]]
+        row = utility[item["emotion"]]
+        original = row.copy()
 
         chosen = ALTERNATIVES.index(item["selected"])
         row[chosen] = round(_clamp(row[chosen] + learning_rate), 4)
@@ -32,24 +38,21 @@ def apply_feedback(memory, learning_rate: float = LEARNING_RATE) -> dict:
                 _clamp(row[rejected] - learning_rate), 4
             )
 
-        updated += 1
+        if row != original:
+            updated += 1
+        else:
+            unchanged += 1
 
-    version = None
-
-    if pending:
-        memory.mark_feedback_processed(
-            [item["id"] for item in pending]
-        )
-
-    if updated:
-        version = memory.save_utility_version(
-            f"{updated} tutor feedback record(s)"
-        )
+    version = memory.complete_feedback_batch(
+        [item["id"] for item in pending], utility if updated else None,
+        f"{updated} tutor feedback record(s)",
+    )
 
     return {
         "processed": len(pending),
         "updated": updated,
         "skipped": skipped,
+        "unchanged": unchanged,
         "version": version,
     }
 
@@ -97,8 +100,8 @@ def run(state: CogState, memory) -> CogState:
     else:
         state.explanation.append(
             f"Learning: {result['updated']} update(s) applied, "
-            f"{result['skipped']} skipped "
-            f"(emotion marked incorrect); "
+            f"{result['skipped']} unconfirmed, "
+            f"{result['unchanged']} already at a limit. "
             f"matrix version {result['version']}."
         )
 

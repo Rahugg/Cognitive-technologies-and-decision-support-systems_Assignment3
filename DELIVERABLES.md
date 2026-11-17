@@ -1,30 +1,9 @@
-# Assignment 3 deliverables
+# Cognitive Technologies final submission
 
-## Project files
+| Requirement | Deliverable |
+| --- | --- |
+| Presentation | [Tutor Decision Support PDF](output/Tutor_Decision_Support.pdf), 10 slides. Present in 5 minutes. |
+| Program | [Tutor Decision Support ZIP](output/Tutor_Decision_Support.zip), with Python source, trained checkpoint, requirements, demo images, evaluation results and instructions. |
+| Live UI | Run Streamlit on the presenter’s computer and demonstrate the workflow in 2 minutes. Follow the [demo script](docs/DEMO.md). |
 
-- [x] Python source: live WebRTC camera app, four cognitive modules, CNN, data/training/demo scripts.
-- [x] Dockerfile and Docker Compose profiles for PostgreSQL, app, data preparation, training and notebook.
-- [x] Assignment notebook with reproducible pipeline and three demo cases.
-- [x] Updated technical report PDF: `Assignment3_Technical_Report_FINAL.pdf`.
-- [x] Updated six-slide presentation: `output/Assignment3_Presentation_FINAL.pptx` (within the required 5-7 slides).
-
-## Required run
-
-```bash
-cp .env.example .env
-docker compose --profile data run --rm dataset-downloader
-docker compose --profile train run --rm trainer
-docker compose up --build
-docker compose exec app python scripts/run_demo.py
-```
-
-Run `make run` or double-click `Run Emotion Recognition.command`. Open `http://localhost:8501`, click **START** in **Live camera**, and allow camera access. For Jupyter use `docker compose --profile notebook up jupyter db` and open `http://localhost:8888`.
-
-## Submission checks
-
-- The older `Assignment3_Technical_Report.pdf` and `Assignment3_Presentation.pptx` are source drafts; submit the files marked `FINAL`.
-- Run data download and training; retain generated metrics JSON with the trained model.
-- Run all three demonstrations and capture their actual outputs for the report/presentation.
-- Replace the team-contribution placeholder with the students' factual contribution split.
-- Confirm each dataset's current access and license terms. Do not include raw datasets or Kaggle credentials in the submission archive.
-- Do not state that the low-quality example was rejected unless its printed Attention result confirms rejection.
+The ZIP includes the launch instructions in `README.md`. The PDF is submitted separately. The remaining 3 minutes of the defense are for questions about the implementation, ranking, tests and limitations.

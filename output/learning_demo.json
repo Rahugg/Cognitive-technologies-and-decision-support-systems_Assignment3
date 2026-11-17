@@ -3,9 +3,10 @@
   "feedback_per_emotion": 5,
   "learning_summary": {
     "processed": 35,
-    "updated": 35,
+    "updated": 34,
     "skipped": 0,
-    "version": 2
+    "unchanged": 1,
+    "version": 1
   },
   "matrix_before": {
     "angry": [
@@ -134,7 +135,7 @@
           0.517
         ]
       ],
-      "decision_id": 2,
+      "decision_id": 1,
       "tutor_choice": "easier_task"
     },
     "disgust": {
@@ -161,7 +162,7 @@
           0.385
         ]
       ],
-      "decision_id": 3,
+      "decision_id": 2,
       "tutor_choice": "ask_directly"
     },
     "fear": {
@@ -188,7 +189,7 @@
           0.444
         ]
       ],
-      "decision_id": 4,
+      "decision_id": 3,
       "tutor_choice": "continue"
     },
     "happy": {
@@ -215,7 +216,7 @@
           0.25
         ]
       ],
-      "decision_id": 5,
+      "decision_id": 4,
       "tutor_choice": "re_explain"
     },
     "neutral": {
@@ -242,7 +243,7 @@
           0.25
         ]
       ],
-      "decision_id": 6,
+      "decision_id": 5,
       "tutor_choice": "re_explain"
     },
     "sad": {
@@ -269,7 +270,7 @@
           0.473
         ]
       ],
-      "decision_id": 7,
+      "decision_id": 6,
       "tutor_choice": "ask_directly"
     },
     "surprise": {
@@ -296,7 +297,7 @@
           0.251
         ]
       ],
-      "decision_id": 8,
+      "decision_id": 7,
       "tutor_choice": "continue"
     }
   },
@@ -325,7 +326,7 @@
           0.54
         ]
       ],
-      "decision_id": 9
+      "decision_id": 8
     },
     "disgust": {
       "recommended": "continue",
@@ -351,7 +352,7 @@
           0.395
         ]
       ],
-      "decision_id": 10
+      "decision_id": 9
     },
     "fear": {
       "recommended": "continue",
@@ -377,7 +378,7 @@
           0.365
         ]
       ],
-      "decision_id": 11
+      "decision_id": 10
     },
     "happy": {
       "recommended": "continue",
@@ -403,7 +404,7 @@
           0.25
         ]
       ],
-      "decision_id": 12
+      "decision_id": 11
     },
     "neutral": {
       "recommended": "continue",
@@ -429,7 +430,7 @@
           0.25
         ]
       ],
-      "decision_id": 13
+      "decision_id": 12
     },
     "sad": {
       "recommended": "continue",
@@ -455,7 +456,7 @@
           0.455
         ]
       ],
-      "decision_id": 14
+      "decision_id": 13
     },
     "surprise": {
       "recommended": "continue",
@@ -481,7 +482,7 @@
           0.252
         ]
       ],
-      "decision_id": 15
+      "decision_id": 14
     }
   }
 }
