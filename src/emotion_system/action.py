@@ -15,8 +15,8 @@ def run(state: CogState, memory) -> CogState:
     text = f"Recommended: {best['alternative']}. Main reasons: {why}."
     if not state.accepted:
         ask = next(r["rank"] for r in state.ranking if r["alternative"] == "ask_directly")
-        text = (f"Current frame is unreliable ({state.reject_reason}), so the ranking leans on "
-                f"earlier frames. " + text + f" Asking the student directly is ranked #{ask}.")
+        text = (f"Current frame is unreliable ({state.reject_reason}), so reasoning uses accepted "
+                f"history when available. " + text + f" Asking the student directly is ranked #{ask}.")
     elif state.label == "uncertain":
         text = "The expression is unclear; confirm with the student. " + text
     state.action = text
@@ -30,7 +30,7 @@ def run(state: CogState, memory) -> CogState:
     state.explanation.append(f"Action: {'recorded in PostgreSQL' if written else 'kept in memory only (no DB)'}.")
     state.report = {**record, "session_id": state.session_id, "text": text, "label": state.label,
                     "rules": state.rules, "reasoning_steps": state.reasoning_steps,
-                    "explanation": state.explanation, "explanation": state.explanation, "db_written": written, "decision_id": decision_id,
+                    "explanation": state.explanation, "db_written": written, "decision_id": decision_id,
                     "limitation": LIMITATION,
                     "created_at": datetime.now(timezone.utc).isoformat()}
     return state

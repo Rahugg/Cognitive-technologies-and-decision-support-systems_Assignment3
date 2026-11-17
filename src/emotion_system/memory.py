@@ -28,12 +28,14 @@ class Memory:
         self.feedback = []  # in-memory copy of tutor feedback (always kept)
         self.utility_history = []  # in-memory copy of matrix versions (always kept)
         self.last_decision_id = None  # id of the most recent save_decision()
+        self.db_ok = False
+        if not self.database_url:
+            return
         try:
             self._initialize()
             self._load_latest_utility()
             self.db_ok = True
         except psycopg.Error as error:
-            self.db_ok = False
             log.warning("PostgreSQL unavailable (%s); using in-memory storage only.", error)
 
     def _connect(self):

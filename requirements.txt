@@ -6,6 +6,7 @@ torch==2.5.1
 torchvision==0.20.1
 streamlit==1.41.1
 streamlit-webrtc==0.63.5
+av==18.1.0
 psycopg[binary]==3.2.3
 networkx==3.4.2
 kagglehub==0.3.6
