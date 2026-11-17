@@ -276,6 +276,11 @@ class Memory:
             {"version": version, "matrix": snapshot, "reason": reason, "created_at": _now()})
         return version
 
+    def reset_utility(self, reason="reset to expert matrix"):
+        """Restore the original expert utility matrix and save a version."""
+        self.utility = copy.deepcopy(UTILITY)
+        return self.save_utility_version(reason)
+
     def utility_versions(self):
         """All saved versions of matrix M, oldest first."""
         if not self.db_ok:
