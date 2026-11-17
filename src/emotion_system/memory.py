@@ -8,9 +8,13 @@ import psycopg
 from psycopg.types.json import Jsonb
 from psycopg.rows import dict_row
 
-from .config import UTILITY
+from .config import ALTERNATIVES, EMOTIONS, UTILITY
 
 log = logging.getLogger(__name__)
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat()
 
 
 class Memory:
@@ -21,8 +25,12 @@ class Memory:
         self.sessions = defaultdict(lambda: deque(maxlen=window))
         self.utility = copy.deepcopy(UTILITY)  # matrix M; Learning may update it
         self.decisions = []  # in-memory copy of decision records (always kept)
+        self.feedback = []  # in-memory copy of tutor feedback (always kept)
+        self.utility_history = []  # in-memory copy of matrix versions (always kept)
+        self.last_decision_id = None  # id of the most recent save_decision()
         try:
             self._initialize()
+            self._load_latest_utility()
             self.db_ok = True
         except psycopg.Error as error:
             self.db_ok = False
@@ -65,6 +73,37 @@ class Memory:
                     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
+            # --- Learning / feedback (Role B) ---
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    id BIGSERIAL PRIMARY KEY,
+                    decision_id BIGINT REFERENCES decisions(id),
+                    session_id TEXT NOT NULL,
+                    emotion TEXT NOT NULL,
+                    recommended TEXT NOT NULL,
+                    selected TEXT NOT NULL,
+                    emotion_correct BOOLEAN NOT NULL,
+                    processed BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS utility_versions (
+                    id BIGSERIAL PRIMARY KEY,
+                    matrix JSONB NOT NULL,
+                    reason TEXT NOT NULL DEFAULT '',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
+
+    def _load_latest_utility(self):
+        """Restore the most recently saved matrix M, if Learning has saved one."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT matrix FROM utility_versions ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        if row:
+            self.utility = row["matrix"]
 
     def previous(self, session_id):
         if not self.db_ok:
@@ -92,6 +131,7 @@ class Memory:
         history = [item["probabilities"] for item in self.sessions[session_id]
                    if item["accepted"] and "probabilities" in item]
         history.append(perception["probabilities"])
+
         history = history[-self.sessions[session_id].maxlen:]
         count = len(history)
         probabilities = {
@@ -111,7 +151,7 @@ class Memory:
             "accepted": bool(attention["accepted"]),
             "probabilities": perception["probabilities"],
             "outcome": outcome,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": _now(),
         }
         self.sessions[session_id].append(record)
         if not self.db_ok:
@@ -127,15 +167,122 @@ class Memory:
         return record
 
     def save_decision(self, session_id, record):
-        """Store one decision record (metadata only, no images)."""
-        self.decisions.append({"session_id": session_id, **record})
+        """Store one decision record (metadata only, no images).
+
+        Returns True if written to PostgreSQL, False if kept in memory only.
+        The id of the new decision is available as self.last_decision_id.
+        """
+        entry = {"session_id": session_id, **record}
+        self.decisions.append(entry)
         if not self.db_ok:
+            entry["id"] = len(self.decisions)
+            self.last_decision_id = entry["id"]
             return False
         with self._connect() as conn:
-            conn.execute(
+            row = conn.execute(
                 "INSERT INTO decisions (session_id, recommended, emotion, reliability, "
-                "trend, accepted, ranking) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                "trend, accepted, ranking) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
                 (session_id, record["recommended"], record["emotion"], record["reliability"],
                  record["trend"], record["accepted"], Jsonb(record["ranking"])),
-            )
+            ).fetchone()
+        entry["id"] = row["id"]
+        self.last_decision_id = row["id"]
         return True
+
+    # ------------------------------------------------------------------
+    # Tutor feedback (Role B)
+    # ------------------------------------------------------------------
+    def save_feedback(self, session_id, emotion, recommended, selected,
+                      emotion_correct, decision_id=None):
+        """Store one piece of tutor feedback and return it as a dict.
+
+        emotion: emotion the system recognized for the decision.
+        recommended: action the system recommended.
+        selected: action the tutor actually chose.
+        emotion_correct: did the tutor agree with the recognized emotion?
+        """
+        if emotion not in EMOTIONS:
+            raise ValueError(f"Unknown emotion: {emotion!r}")
+        if recommended not in ALTERNATIVES:
+            raise ValueError(f"Unknown recommended action: {recommended!r}")
+        if selected not in ALTERNATIVES:
+            raise ValueError(f"Unknown selected action: {selected!r}")
+
+        record = {
+            "decision_id": decision_id,
+            "session_id": session_id,
+            "emotion": emotion,
+            "recommended": recommended,
+            "selected": selected,
+            "emotion_correct": bool(emotion_correct),
+            "processed": False,
+            "created_at": _now(),
+        }
+        if self.db_ok:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "INSERT INTO feedback (decision_id, session_id, emotion, recommended, "
+                    "selected, emotion_correct) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                    (decision_id, session_id, emotion, recommended, selected,
+                     record["emotion_correct"]),
+                ).fetchone()
+            record["id"] = row["id"]
+        else:
+            record["id"] = len(self.feedback) + 1
+        self.feedback.append(record)
+        return record
+
+    def pending_feedback(self):
+        """Feedback not yet used by Learning, oldest first."""
+        if not self.db_ok:
+            return [dict(r) for r in self.feedback if not r["processed"]]
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, decision_id, session_id, emotion, recommended, selected, "
+                "emotion_correct, processed, created_at FROM feedback "
+                "WHERE processed = FALSE ORDER BY id"
+            ).fetchall()
+        for row in rows:
+            row["created_at"] = row["created_at"].isoformat()
+        return rows
+
+    def mark_feedback_processed(self, feedback_ids):
+        ids = list(feedback_ids)
+        if not ids:
+            return
+        for item in self.feedback:
+            if item["id"] in ids:
+                item["processed"] = True
+        if self.db_ok:
+            with self._connect() as conn:
+                conn.execute("UPDATE feedback SET processed = TRUE WHERE id = ANY(%s)", (ids,))
+
+    # ------------------------------------------------------------------
+    # Utility matrix versions (Role B)
+    # ------------------------------------------------------------------
+    def save_utility_version(self, reason=""):
+        """Snapshot the current matrix M and return its version number."""
+        snapshot = copy.deepcopy(self.utility)
+        if self.db_ok:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "INSERT INTO utility_versions (matrix, reason) VALUES (%s, %s) RETURNING id",
+                    (Jsonb(snapshot), reason),
+                ).fetchone()
+            version = row["id"]
+        else:
+            version = len(self.utility_history) + 1
+        self.utility_history.append(
+            {"version": version, "matrix": snapshot, "reason": reason, "created_at": _now()})
+        return version
+
+    def utility_versions(self):
+        """All saved versions of matrix M, oldest first."""
+        if not self.db_ok:
+            return [dict(v) for v in self.utility_history]
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT id, matrix, reason, created_at FROM utility_versions ORDER BY id"
+            ).fetchall()
+        return [{"version": r["id"], "matrix": r["matrix"], "reason": r["reason"],
+                 "created_at": r["created_at"].isoformat()} for r in rows]
