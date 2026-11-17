@@ -1,21 +1,19 @@
-# Upload examples
+# Demo images
 
-Six individual face crops from the CC0 image **Diverse Facial Expressions**.
+The face crops come from the CC0 illustration **Diverse Facial Expressions** on [Public Domain Pictures](https://www.publicdomainpictures.net/en/view-image.php?image=773242&picture=diverse-facial-expressions). The crops retain that license. These illustrations stand in for lesson frames. Their visual labels describe the artwork.
 
-- Source: https://www.publicdomainpictures.net/en/view-image.php?image=773242&picture=diverse-facial-expressions
-- License: CC0; the source page says attribution is not required.
-- Downloaded standard image: `cc0-diverse-facial-expressions.jpg` (1920 × 1920).
-- The source image is marked AI Generated. These are synthetic test faces, not photographs of real people.
+`dark-smiling-face.jpg` uses the same crop as `smiling-face.jpg` with brightness reduced to 20% and a 2 px Gaussian blur. It exercises the low-quality path with an otherwise recognizable face.
 
-Open the app at `http://localhost:8501`, select **Upload image**, and choose any `*-face.jpg` file. Verified with the current model and app thresholds (`quality ≥ 0.45`, `confidence ≥ 0.25`, and face detected):
+Verified with the bundled checkpoint, default gate thresholds and a fresh analysis window per image:
 
-| File | Expected visual expression | Model output | Confidence | Quality | Passed |
-| --- | --- | --- | ---: | ---: | --- |
-| `laughing-face.jpg` | Laughing / joyful | angry | 58.8% | 0.983 | Yes |
-| `fear-face.jpg` | Fearful | surprise | 41.8% | 0.971 | Yes |
-| `smiling-face.jpg` | Happy | happy | 95.8% | 0.908 | Yes |
-| `sad-face.jpg` | Sad | sad | 29.2% | 0.865 | Yes |
-| `angry-face.jpg` | Angry | angry | 70.0% | 0.992 | Yes |
-| `surprised-face.jpg` | Surprised | happy | 60.8% | 0.912 | Yes |
+| Image | CNN expression | Confidence | Quality | Attention | Default recommendation |
+| --- | --- | ---: | ---: | --- | --- |
+| Angry face | angry | 79.0% | 0.992 | Accepted | Continue the lesson |
+| Dark frame | happy | 86.1% | 0.367 | Rejected | Ask the student directly |
+| Fearful face | surprise | 41.4% | 0.971 | Rejected | Ask the student directly |
+| Laughing face | angry | 64.8% | 0.983 | Accepted | Continue the lesson |
+| Sad face | sad | 36.6% | 0.865 | Rejected | Ask the student directly |
+| Clear smiling face | happy | 96.1% | 0.908 | Accepted | Continue the lesson |
+| Surprised face | happy | 61.1% | 0.912 | Accepted | Continue the lesson |
 
-Expected visual expressions describe the artwork, not verified ground-truth labels. The differences are useful for demonstrating that passing Attention means the image is usable; it does not guarantee the emotion prediction is correct.
+The default gate requires a detected face, quality of at least 0.45 and confidence of at least 0.55. The angry example ranks **Take a short break** first when only the expression fit slider is raised from 35 to 100. The surprised example passes Attention even though the model's label differs from the artwork label.
